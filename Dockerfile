@@ -40,17 +40,17 @@ RUN apt-get update && apt-get install -y \
     libopencv-imgcodecs-dev \
     libopencv-videoio-dev \
     && mkdir -p /app/civetweb \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/app/civetweb/
 
 # Copier les binaires construits
 WORKDIR /app
 COPY --from=build /app/WebcamStreamer /app
-COPY --from=build /app/entrypoint.sh /app
 COPY --from=build /app/civetweb/libcivetweb.so.1 /app/civetweb
 
 # Exposer le port HTTP
 EXPOSE 8080
 
 # Lancer l'application
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["./WebcamStreamer"]
 

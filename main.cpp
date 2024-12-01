@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <signal.h>
 
 std::mutex frame_mutex;
 cv::Mat frame;
@@ -33,6 +34,7 @@ void captureThread() {
     }
 }
 
+// Gestionnaire de la requête, affiche le flux MJPEG
 int streamHandler(struct mg_connection *conn, void *cbdata) {
     (void)cbdata; // Pas utilisé
 
@@ -68,9 +70,28 @@ int streamHandler(struct mg_connection *conn, void *cbdata) {
     return 200; // Réponse HTTP réussie
 }
 
+// Gestion du signal d'arrêt
+void handleSignal(int signal) {
+    //std::cout << "Signal reçu " << signal << std::endl;
+    if (signal == SIGINT || signal == SIGTERM) {
+        running = false;
+        std::cout << "Arrêt du serveur." << std::endl;
+    }
+}
+
 int main() {
+    // Enregistrement du gestionnaire de signal
+    //signal(SIGINT, handleSignal);
+    signal(SIGTERM, handleSignal);
+    //struct sigaction SignalAction;
+    //memset(&SignalAction, 0, sizeof(SignalAction));
+    //SignalAction.sa_handler = handleSignal;
+    //sigaction(SIGTERM, &SignalAction, NULL);
+
+    // Lance le thread de capture vidéo
     std::thread capThread(captureThread);
 
+    // Initialise le serveur HTTP
     const char *options[] = {"listening_ports", "8080", nullptr};
     struct mg_callbacks callbacks = {};
     struct mg_context *ctx = mg_start(&callbacks, nullptr, options);
@@ -81,12 +102,14 @@ int main() {
     } else {
         mg_set_request_handler(ctx, "/stream", streamHandler, nullptr);
         std::cout << "Serveur démarré sur http://localhost:8080/stream" << std::endl;
-        std::cin.get(); // Attente d'une entrée pour arrêter le serveur
     }
 
-    running = false;
+    // Boucle principale pour maintenir le programme actif
+    while (running) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
     capThread.join();
     if (ctx) mg_stop(ctx);
     return 0;
 }
-
