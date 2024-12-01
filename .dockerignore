@@ -1,3 +1,7 @@
 *.zip
-civetweb-master
+civetweb
 .git
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile

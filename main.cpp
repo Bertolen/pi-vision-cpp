@@ -18,7 +18,10 @@ void captureVideo() {
     while (true) {
         cv::Mat frame;
         cap >> frame; // Capture une image
-        if (frame.empty()) break;
+        if (frame.empty()) {
+            std::cerr << "Erreur: image vide." << std::endl;
+            break;
+        }
 
         std::lock_guard<std::mutex> lock(frame_mutex);
         current_frame = frame.clone(); // Sauvegarde l'image actuelle

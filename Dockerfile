@@ -39,12 +39,14 @@ RUN apt-get update && apt-get install -y \
     libopencv-core-dev \
     libopencv-imgcodecs-dev \
     libopencv-videoio-dev \
+    && mkdir -p /app/civetweb \
     && rm -rf /var/lib/apt/lists/*
 
 # Copier les binaires construits
 WORKDIR /app
-COPY --from=build /app/WebcamStreamer .
-COPY --from=build /app/entrypoint.sh .
+COPY --from=build /app/WebcamStreamer /app
+COPY --from=build /app/entrypoint.sh /app
+COPY --from=build /app/civetweb/libcivetweb.so.1 /app/civetweb
 
 # Exposer le port HTTP
 EXPOSE 8080
