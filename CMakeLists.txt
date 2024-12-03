@@ -7,8 +7,8 @@ project(WebcamStreamer)
 add_executable(WebcamStreamer main.cpp)
 
 # Ajoute le chemin vers les en-têtes de CivetWeb
-target_include_directories(WebcamStreamer PRIVATE /app/civetweb/include)
-target_link_libraries(WebcamStreamer /app/civetweb/libcivetweb.so)
+target_include_directories(WebcamStreamer PRIVATE ${CMAKE_SOURCE_DIR}/civetweb/include)
+target_link_libraries(WebcamStreamer ${CMAKE_SOURCE_DIR}/civetweb/libcivetweb.so)
 
 # Lier les bibliothèques nécessaires
 find_package(OpenCV REQUIRED)
