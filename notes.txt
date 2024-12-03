@@ -1,5 +1,5 @@
 docker build -t webcam-streamer .
 
-docker run --rm -d --device=/dev/video0:/dev/video0 -p 8080:8080 --name webcam-stream webcam-streamer
+docker run -d --rm --device=/dev/video0:/dev/video0 --device=/dev/video2:/dev/video2 -p 8080:8080 --name webcam-stream webcam-streamer
 
 Rappel : pour trouver l'adresse ip de l'hôte il faut utiliser la commande ifconfig

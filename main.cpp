@@ -9,11 +9,12 @@
 #define NB_WEBCAMS 2
 std::mutex frameMutexes[NB_WEBCAMS];
 cv::Mat frames[NB_WEBCAMS];
+int cameraDevice[NB_WEBCAMS] = {0, 2};
 bool running = true;
 
 // Thread séparé qui capture le flux des caméras
 void captureThread(int camID) {
-    cv::VideoCapture cap(camID);
+    cv::VideoCapture cap(cameraDevice[camID]);
     if (!cap.isOpened()) {
         std::cerr << "Erreur : impossible d'ouvrir la caméra. ID = " << camID << std::endl;
         running = false;
@@ -75,7 +76,6 @@ int streamHandler(struct mg_connection *conn, void *param) {
 
 // Gestion de la page HTML
 int rootHandler(struct mg_connection *conn, void *param) {
-    std::cout << "Entrée dans l'index" << std::endl;
     FILE *file = fopen("index.html", "r");
     if (!file) {
         mg_printf(conn,
@@ -131,17 +131,18 @@ int main() {
     signal(SIGTERM, handleSignal);
     signal(SIGINT, handleSignal);
 
+    // Initialise les identifiants des caméras
+    int cam1ID = 0;
+    int cam2ID = 1;
+
     // Lance le thread de capture vidéo
-    std::thread capThread1(captureThread, 0);
-    //std::thread capThread2(captureThread, 1);
+    std::thread capThread1(captureThread, cam1ID);
+    std::thread capThread2(captureThread, cam2ID);
 
     // Initialise le serveur HTTP
     const char *options[] = {"listening_ports", "8080", nullptr};
     struct mg_callbacks callbacks = {};
     struct mg_context *ctx = mg_start(&callbacks, nullptr, options);
-
-    int cam1ID = 0;
-    int cam2ID = 1;
 
     if (ctx == nullptr) {
         std::cerr << "Erreur : impossible de démarrer le serveur HTTP." << std::endl;
