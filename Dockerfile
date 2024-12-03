@@ -1,5 +1,5 @@
 # Étape 1 : Construire l'application
-FROM ubuntu:22.04 as build
+FROM ubuntu:22.04 AS build
 
 # Installer les dépendances nécessaires
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY --from=build /app/WebcamStreamer /app
 COPY --from=build /app/civetweb/libcivetweb.so.1 /app/civetweb
+COPY --from=build /app/index.html /app
 
 # Exposer le port HTTP
 EXPOSE 8080

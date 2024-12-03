@@ -4,12 +4,14 @@
 #include <thread>
 #include <mutex>
 #include <signal.h>
+#include <random>
 
 #define NB_WEBCAMS 2
 std::mutex frameMutexes[NB_WEBCAMS];
 cv::Mat frames[NB_WEBCAMS];
 bool running = true;
 
+// Thread séparé qui capture le flux des caméras
 void captureThread(int camID) {
     cv::VideoCapture cap(camID);
     if (!cap.isOpened()) {
@@ -71,6 +73,50 @@ int streamHandler(struct mg_connection *conn, void *param) {
     return 200; // Réponse HTTP réussie
 }
 
+// Gestion de la page HTML
+int rootHandler(struct mg_connection *conn, void *param) {
+    std::cout << "Entrée dans l'index" << std::endl;
+    FILE *file = fopen("index.html", "r");
+    if (!file) {
+        mg_printf(conn,
+                  "HTTP/1.1 404 Not Found\r\n"
+                  "Content-Type: text/plain\r\n\r\n"
+                  "File not found!");
+        return 404;
+    }
+
+    // Lire le contenu du fichier
+    fseek(file, 0, SEEK_END);
+    size_t fileSize = ftell(file);
+    rewind(file);
+    std::vector<char> fileContent(fileSize);
+    fread(fileContent.data(), 1, fileSize, file);
+    fclose(file);
+
+    // Envoyer la réponse
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/html\r\n"
+              "Content-Length: %zu\r\n\r\n",
+              fileSize);
+    mg_write(conn, fileContent.data(), fileSize);
+    return 200;
+}
+
+// Gestion du bouton
+int buttonHandler(struct mg_connection *conn, void *param) {
+    {
+        std::lock_guard<std::mutex> lock1(frameMutexes[1]);
+        std::lock_guard<std::mutex> lock0(frameMutexes[0]);
+        frames[1] = frames[0].clone();
+    }
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/plain\r\n\r\n"
+              "Frame freeze success!");
+    return 200;
+}
+
 // Gestion du signal d'arrêt
 void handleSignal(int signal) {
     //std::cout << "Signal reçu " << signal << std::endl;
@@ -103,7 +149,9 @@ int main() {
     } else {
         mg_set_request_handler(ctx, "/video1", streamHandler, &cam1ID);
         mg_set_request_handler(ctx, "/video2", streamHandler, &cam2ID);
-        std::cout << "Serveur démarré sur http://localhost:8080/video1" << std::endl;
+        mg_set_request_handler(ctx, "/freezeFrame", buttonHandler, nullptr);
+        mg_set_request_handler(ctx, "/", rootHandler, nullptr);
+        std::cout << "Serveur démarré sur http://localhost:8080/" << std::endl;
     }
 
     // Boucle principale pour maintenir le programme actif
