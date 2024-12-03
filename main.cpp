@@ -5,14 +5,15 @@
 #include <mutex>
 #include <signal.h>
 
-std::mutex frame_mutex;
-cv::Mat frame;
+#define NB_WEBCAMS 2
+std::mutex frameMutexes[NB_WEBCAMS];
+cv::Mat frames[NB_WEBCAMS];
 bool running = true;
 
-void captureThread() {
-    cv::VideoCapture cap(0); // 0 pour la webcam par défaut
+void captureThread(int camID) {
+    cv::VideoCapture cap(camID);
     if (!cap.isOpened()) {
-        std::cerr << "Erreur : impossible d'ouvrir la caméra." << std::endl;
+        std::cerr << "Erreur : impossible d'ouvrir la caméra. ID = " << camID << std::endl;
         running = false;
         return;
     }
@@ -28,15 +29,15 @@ void captureThread() {
         if (temp_frame.empty()) continue;
 
         {
-            std::lock_guard<std::mutex> lock(frame_mutex);
-            frame = temp_frame.clone();
+            std::lock_guard<std::mutex> lock(frameMutexes[camID]);
+            frames[camID] = temp_frame.clone();
         }
     }
 }
 
 // Gestionnaire de la requête, affiche le flux MJPEG
-int streamHandler(struct mg_connection *conn, void *cbdata) {
-    (void)cbdata; // Pas utilisé
+int streamHandler(struct mg_connection *conn, void *param) {
+    int *cameraID = (int *)(param);
 
     // En-têtes pour le flux MJPEG
     mg_printf(conn,
@@ -48,9 +49,9 @@ int streamHandler(struct mg_connection *conn, void *cbdata) {
     while (running) {
         std::vector<uchar> buf;
         {
-            std::lock_guard<std::mutex> lock(frame_mutex);
-            if (!frame.empty()) {
-                cv::imencode(".jpg", frame, buf);
+            std::lock_guard<std::mutex> lock(frameMutexes[*cameraID]);
+            if (!frames[*cameraID].empty()) {
+                cv::imencode(".jpg", frames[*cameraID], buf);
             }
         }
 
@@ -81,27 +82,28 @@ void handleSignal(int signal) {
 
 int main() {
     // Enregistrement du gestionnaire de signal
-    //signal(SIGINT, handleSignal);
     signal(SIGTERM, handleSignal);
-    //struct sigaction SignalAction;
-    //memset(&SignalAction, 0, sizeof(SignalAction));
-    //SignalAction.sa_handler = handleSignal;
-    //sigaction(SIGTERM, &SignalAction, NULL);
+    signal(SIGINT, handleSignal);
 
     // Lance le thread de capture vidéo
-    std::thread capThread(captureThread);
+    std::thread capThread1(captureThread, 0);
+    //std::thread capThread2(captureThread, 1);
 
     // Initialise le serveur HTTP
     const char *options[] = {"listening_ports", "8080", nullptr};
     struct mg_callbacks callbacks = {};
     struct mg_context *ctx = mg_start(&callbacks, nullptr, options);
 
+    int cam1ID = 0;
+    int cam2ID = 1;
+
     if (ctx == nullptr) {
         std::cerr << "Erreur : impossible de démarrer le serveur HTTP." << std::endl;
         running = false;
     } else {
-        mg_set_request_handler(ctx, "/stream", streamHandler, nullptr);
-        std::cout << "Serveur démarré sur http://localhost:8080/stream" << std::endl;
+        mg_set_request_handler(ctx, "/video1", streamHandler, &cam1ID);
+        mg_set_request_handler(ctx, "/video2", streamHandler, &cam2ID);
+        std::cout << "Serveur démarré sur http://localhost:8080/video1" << std::endl;
     }
 
     // Boucle principale pour maintenir le programme actif
@@ -109,7 +111,8 @@ int main() {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    capThread.join();
+    capThread1.join();
+    //capThread2.join();
     if (ctx) mg_stop(ctx);
     return 0;
 }
