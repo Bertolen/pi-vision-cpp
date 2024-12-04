@@ -5,6 +5,7 @@
 #include <mutex>
 #include <signal.h>
 #include <random>
+#include <string>
 
 #define NB_WEBCAMS 2
 std::mutex frameMutexes[NB_WEBCAMS];
@@ -103,17 +104,25 @@ int rootHandler(struct mg_connection *conn, void *param) {
     return 200;
 }
 
+// Enregistrement des images des deux caméras
+void saveFrames() {
+    for (int i = 0 ; i < NB_WEBCAMS ; i++) {
+        std::string fileName = "images/camera" + std::to_string(i) + ".jpg";
+        {
+             std::lock_guard<std::mutex> lock(frameMutexes[i]);
+             cv::imwrite(fileName, frames[i]);
+        }
+    }
+}
+
 // Gestion du bouton
 int buttonHandler(struct mg_connection *conn, void *param) {
-    {
-        std::lock_guard<std::mutex> lock1(frameMutexes[1]);
-        std::lock_guard<std::mutex> lock0(frameMutexes[0]);
-        frames[1] = frames[0].clone();
-    }
+    saveFrames();
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\n"
               "Content-Type: text/plain\r\n\r\n"
-              "Frame freeze success!");
+              "Success!");
     return 200;
 }
 
@@ -150,7 +159,7 @@ int main() {
     } else {
         mg_set_request_handler(ctx, "/video1", streamHandler, &cam1ID);
         mg_set_request_handler(ctx, "/video2", streamHandler, &cam2ID);
-        mg_set_request_handler(ctx, "/freezeFrame", buttonHandler, nullptr);
+        mg_set_request_handler(ctx, "/saveFrames", buttonHandler, nullptr);
         mg_set_request_handler(ctx, "/", rootHandler, nullptr);
         std::cout << "Serveur démarré sur http://localhost:8080/" << std::endl;
     }

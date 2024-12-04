@@ -38,22 +38,22 @@
     <h1>Dual MJPEG Stream</h1>
     <div class="video-container">
         <div>
-            <h2>Camera</h2>
-            <img src="/video1" class="video-stream" alt="Stream">
+            <h2>Camera 1</h2>
+            <img src="/video1" class="video-stream" alt="Stream 1">
         </div>
         <div>
-            <h2>Saved frame</h2>
-            <img src="/video2" class="video-stream" alt="Frame">
+            <h2>Camera 2</h2>
+            <img src="/video2" class="video-stream" alt="Stream 2">
         </div>
     </div>
-    <button onclick="freezeFrame()">Freeze Frame</button>
+    <button onclick="saveFrames()">Save Frames</button>
 
     <script>
-        function freezeFrame() {
-            fetch('/freezeFrame', { method: 'POST' })
+        function saveFrames() {
+            fetch('/saveFrames', { method: 'POST' })
                 .then(response => {
                     if (!response.ok) {
-                        alert('Failed to freeze frame.');
+                        alert('Failed to save frames.');
                     }
                 })
                 .catch(err => alert('Error: ' + err));
