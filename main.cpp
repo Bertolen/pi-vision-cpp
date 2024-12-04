@@ -12,6 +12,7 @@ std::mutex frameMutexes[NB_WEBCAMS];
 cv::Mat frames[NB_WEBCAMS];
 int cameraDevice[NB_WEBCAMS] = {0, 2};
 bool running = true;
+int nbImages = 0;
 
 // Thread séparé qui capture le flux des caméras
 void captureThread(int camID) {
@@ -107,12 +108,29 @@ int rootHandler(struct mg_connection *conn, void *param) {
 // Enregistrement des images des deux caméras
 void saveFrames() {
     for (int i = 0 ; i < NB_WEBCAMS ; i++) {
-        std::string fileName = "images/camera" + std::to_string(i) + ".jpg";
+        std::string fileName = "images/camera" + std::to_string(i) + "-" + std::to_string(nbImages) + ".jpg";
         {
              std::lock_guard<std::mutex> lock(frameMutexes[i]);
              cv::imwrite(fileName, frames[i]);
         }
     }
+
+    nbImages++;
+}
+
+// Affiche le nombre d'images prises
+std::string printImageCount() {
+    return "Image count : " + std::to_string(nbImages);
+}
+
+// Gestion de l'affichage du nombre d'images prises
+int imageCountHandler(struct mg_connection *conn, void *param) {
+    mg_printf(conn,
+              "HTTP/1.1 200OK\r\n"
+              "Content-Type: text/pain\r\n\r\n"
+              "%s",
+              printImageCount());
+    return 200;
 }
 
 // Gestion du bouton
@@ -160,6 +178,7 @@ int main() {
         mg_set_request_handler(ctx, "/video1", streamHandler, &cam1ID);
         mg_set_request_handler(ctx, "/video2", streamHandler, &cam2ID);
         mg_set_request_handler(ctx, "/saveFrames", buttonHandler, nullptr);
+        mg_set_request_handler(ctx, "/imageCount", imageCountHandler, nullptr);
         mg_set_request_handler(ctx, "/", rootHandler, nullptr);
         std::cout << "Serveur démarré sur http://localhost:8080/" << std::endl;
     }
