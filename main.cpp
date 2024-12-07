@@ -6,12 +6,18 @@
 #include <signal.h>
 #include <random>
 #include <string>
+#include <filesystem>
+#include <regex>
+
+namespace fs = std::filesystem;
 
 #define NB_WEBCAMS 2
 std::mutex frameMutexes[NB_WEBCAMS];
 cv::Mat frames[NB_WEBCAMS];
 int cameraDevice[NB_WEBCAMS] = {0, 2};
+
 bool running = true;
+
 int nbImages = 0;
 
 // Thread séparé qui capture le flux des caméras
@@ -153,10 +159,63 @@ void handleSignal(int signal) {
     }
 }
 
+// Lecture du nombre d'images déj'a présentes par caméra
+int nbImagesInMemoryByCamID(int camID) {
+    int cpt = 0;
+    std::string directoryPath = "./images";
+
+    std::regex pattern("^camera" + std::to_string(camID) + ".*\\.jpg$");
+
+    try {
+        // Parcourir les fichiers dans le dossier
+        for (const auto& entry : fs::directory_iterator(directoryPath)) {
+            // Vérifier si l'entrée est un fichier régulier
+            if (fs::is_regular_file(entry)) {
+                // Extraire le nom du fichier
+                std::string filename = entry.path().filename().string();
+
+                // Vérifier si le nom du fichier correspond au modèle
+                if (std::regex_match(filename, pattern)) {
+                    ++cpt;
+                }
+            }
+        }
+
+        // Afficher le nombre de fichiers correspondants
+        return cpt;
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Erreur : " << e.what() << std::endl;
+        return -1;
+    }
+}
+
+// Lecture du nombre de combinaisons d'images déjà présentes
+int nbImagesInMemory() {
+    if (NB_WEBCAMS < 2) {
+        std::cerr << "Erreur : il doit y avoir au moins deux cameras" << std::endl;
+        return -1;
+    }
+
+    int nbCombinations = nbImagesInMemoryByCamID(0);
+
+    for (int i = 1 ; i < NB_WEBCAMS ; i++) {
+        int nbCurrentImages = nbImagesInMemoryByCamID(i);
+        if (nbCombinations < nbCurrentImages) {
+            nbCombinations = nbCurrentImages;
+        }
+    }
+
+    std::cout << "Nombre de combinaisons d'images : " << std::to_string(nbCombinations) << std::endl;
+    return nbCombinations;
+}
+
 int main() {
     // Enregistrement du gestionnaire de signal
     signal(SIGTERM, handleSignal);
     signal(SIGINT, handleSignal);
+
+    // Initialise le nombre d'images
+    nbImages = nbImagesInMemory();
 
     // Initialise les identifiants des caméras
     int cam1ID = 0;
