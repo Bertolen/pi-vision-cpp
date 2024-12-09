@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y \
     libopencv-core-dev \
     libopencv-imgcodecs-dev \
     libopencv-videoio-dev \
+    libopencv-calib3d-dev \    
     && mkdir -p /app/civetweb \
     && rm -rf /var/lib/apt/lists/* \
     && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/app/civetweb/
