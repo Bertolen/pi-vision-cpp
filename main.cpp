@@ -16,6 +16,7 @@ std::mutex frameMutexes[NB_WEBCAMS];
 cv::Mat frames[NB_WEBCAMS];
 int cameraDevice[NB_WEBCAMS] = {0, 2};
 
+bool webcamCapture = true;
 bool running = true;
 
 int nbImages = 0;
@@ -35,6 +36,8 @@ void captureThread(int camID) {
     cap.set(cv::CAP_PROP_FPS, 30);
 
     while (running) {
+        if(!webcamCapture) continue;
+
         cv::Mat temp_frame;
         cap >> temp_frame; // Capture une nouvelle image
         if (temp_frame.empty()) continue;
@@ -228,8 +231,10 @@ void saveCalibration(const std::string& filename,
 void calibrateCameras() {
     std::cout << "Début calibration" << std::endl;
 
-    const int boardWidth = 8, boardHeight = 8;
-    const float squareSize = 0.025f; // Taille réelle des carrés en mètres
+    webcamCapture = false; // désactive le flux venant des webcams
+
+    const int boardWidth = 7, boardHeight = 5; // C'est le nombre de COINS INTERNES et pas de cases (donc pour 8*6 cases il faut 7*5 coins)
+    const float squareSize = 0.019f; // Taille réelle des carrés en mètres
     const int numImages = nbImages;
 
     cv::Size boardSize(boardWidth, boardHeight);
@@ -254,6 +259,15 @@ void calibrateCameras() {
 
         cv::cvtColor(frame1, gray1, cv::COLOR_BGR2GRAY);
         cv::cvtColor(frame2, gray2, cv::COLOR_BGR2GRAY);
+
+        {
+            std::lock_guard<std::mutex> lock(frameMutexes[0]);
+            frames[0] = gray1.clone();
+        }
+        {
+            std::lock_guard<std::mutex> lock(frameMutexes[1]);
+            frames[1] = gray2.clone();
+        }
 
         std::vector<cv::Point2f> corners1, corners2;
         bool found1 = cv::findChessboardCorners(gray1, boardSize, corners1,
@@ -293,7 +307,7 @@ void calibrateCameras() {
 
     // Sauvegarder les paramètres de calibration
     saveCalibration("./data/calibration/stereo_calib.yml", cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T);
-
+    webcamCapture = true;  // Réactive le flux vidéo des caméras
 
     std::cout << "Calibration terminée et sauvegardée dans 'data/stereo_calib.yml'." << std::endl;
 }
