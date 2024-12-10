@@ -4,7 +4,11 @@ cmake_minimum_required(VERSION 3.10)
 project(WebcamStreamer)
 
 # Ajouter les fichiers source
-add_executable(WebcamStreamer main.cpp)
+include_directories(include)
+set(SOURCES
+    src/main.cpp
+    src/IndexController.cpp)
+add_executable(WebcamStreamer ${SOURCES})
 
 # Ajoute le chemin vers les en-têtes de CivetWeb
 target_include_directories(WebcamStreamer PRIVATE ${CMAKE_SOURCE_DIR}/civetweb/include)
