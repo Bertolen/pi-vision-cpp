@@ -316,6 +316,9 @@ void CalibrationController::calibrateCameras() {
 
     // Calibration des caméras
     std::cout << "Calibration caméras" << std::endl;
+    std::cout << "Taille nb objets : " << std::to_string(objectPoints.size()) << std::endl;
+    std::cout << "Taille échiquiers gauche : " << std::to_string(imagePoints1.size()) << std::endl;
+    std::cout << "Taille échiquiers droite : " << std::to_string(imagePoints2.size()) << std::endl;
     cv::Mat cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2;
     cv::Mat R, T, E, F;
 
