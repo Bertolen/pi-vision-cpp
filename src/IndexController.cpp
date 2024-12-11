@@ -140,6 +140,7 @@ void IndexController::captureThread(int camID) {
             frames[camID] = temp_frame.clone();
         }
     }
+    cap.release();
 }
 
 // Gestionnaire de la requête, affiche le flux MJPEG
