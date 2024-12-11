@@ -5,24 +5,38 @@ std::mutex CalibrationController::chessboardMutexes[NB_WEBCAMS];
 cv::Mat CalibrationController::chessboards[NB_WEBCAMS];
 bool CalibrationController::running;
 int CalibrationController::nbImages;
+IndexController* CalibrationController::indexCtrl;
+cv::Size CalibrationController::boardSize;
+int CalibrationController::cameraID[NB_WEBCAMS];
 
-CalibrationController::CalibrationController(struct mg_context* ctx, IndexController* indexCtrl) :
-    indexCtrl(indexCtrl) {
+CalibrationController::CalibrationController(struct mg_context* ctx, IndexController* indexCtrl) {
+
+    this->indexCtrl = indexCtrl;
+
+     // C'est le nombre de COINS INTERNES et pas de cases (donc pour 8*6 cases il faut 7*5 coins)
+    boardWidth = 7;
+    boardHeight = 5;
+    squareSize = 0.019f; // Taille réelle des carrés en mètres
+    boardSize = cv::Size(boardWidth, boardHeight);
 
     // Initialise le nombre d'images
     nbImages = nbImagesInMemory();
 
     // Initialise les identifiants des caméras
-    int cam1ID = 0;
-    int cam2ID = 1;
+    cameraID[0] = 0;
+    cameraID[1] = 1;
+
+    // Lance les threads de capture vidéo
+    calibThread1 = std::thread(CalibrationController::calibThread, cameraID[0]);
+    calibThread2 = std::thread(CalibrationController::calibThread, cameraID[1]);
 
     // Configure les handlers
     if(ctx == nullptr) {
         std::cerr << "Erreur : impossible de démarrer le serveur HTTP." << std::endl;
         running = false;
     } else {
-        mg_set_request_handler(ctx, "/chessboard1", streamHandler, &cam1ID);
-        mg_set_request_handler(ctx, "/chessboard2", streamHandler, &cam2ID);
+        mg_set_request_handler(ctx, "/chessboard1", streamHandler, &cameraID[0]);
+        mg_set_request_handler(ctx, "/chessboard2", streamHandler, &cameraID[1]);
         mg_set_request_handler(ctx, "/calibrate", buttonHandler, nullptr);
         mg_set_request_handler(ctx, "/calibration", rootHandler, nullptr);
         running = true;
@@ -30,6 +44,38 @@ CalibrationController::CalibrationController(struct mg_context* ctx, IndexContro
 }
 
 CalibrationController::~CalibrationController() {
+    running = false;
+}
+
+// Thread qui reprends l'image et tente de trouver l'échiquier
+void CalibrationController::calibThread(int camID) {
+    while(running){
+        cv::Mat frame = indexCtrl->getFrameById(camID);
+        if(frame.empty()) continue;
+
+        // Conversion de l'image en nuaces de gris
+        cv::Mat gray;
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+
+        // Recherche de l'échiquier
+        std::vector<cv::Point2f> corners;
+        bool found = cv::findChessboardCorners(gray, boardSize, corners,
+                        cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
+
+        if(found) {            
+            // Affichage de l'échiquier
+            cv::cornerSubPix(gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
+                             cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.1));
+            cv::drawChessboardCorners(gray, boardSize, corners, found);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(chessboardMutexes[camID]);
+            chessboards[camID] = gray.clone();
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
+    }
 }
 
 // Lecture du nombre d'images déj'a présentes par caméra

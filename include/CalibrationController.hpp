@@ -18,6 +18,9 @@ class CalibrationController {
     CalibrationController(struct mg_context* ctx, IndexController* indexCtrl);
     ~CalibrationController();
 
+    // Threads de caméra
+    void static calibThread(int camID);
+
     // Handlers
     static int streamHandler(struct mg_connection *conn, void *param);
     static int rootHandler(struct mg_connection *conn, void *param);
@@ -28,12 +31,20 @@ class CalibrationController {
 
     private:
 
+    void calibrateCameras();
+
     static void saveFrames();
 
-    IndexController* indexCtrl;
-
+    std::thread calibThread1;
+    std::thread calibThread2;
+    int boardWidth, boardHeight;
+    float squareSize;
+    
+    static cv::Size boardSize;
+    static IndexController* indexCtrl;
     static std::mutex chessboardMutexes[NB_WEBCAMS];
     static cv::Mat chessboards[NB_WEBCAMS];
+    static int cameraID[NB_WEBCAMS];
     static bool running;
     static int nbImages;
 };

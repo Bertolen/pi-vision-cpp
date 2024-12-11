@@ -6,6 +6,7 @@
 #include <iostream>
 #include <regex>
 #include <filesystem>
+
 #include "commons.hpp"
 
 namespace fs = std::filesystem;
@@ -22,16 +23,11 @@ class IndexController {
     // Handlers
     static int streamHandler(struct mg_connection *conn, void *param);
     static int rootHandler(struct mg_connection *conn, void *param);
-    static int buttonHandler(struct mg_connection *conn, void *param);
 
-    int nbImagesInMemory();
-    int nbImagesInMemoryByCamID(int camID);
+    // Getter
+    cv::Mat getFrameById(int id);
 
     private:
-
-    static bool running;
-
-    static void saveFrames();
 
     std::thread capThread1;
     std::thread capThread2;
@@ -39,6 +35,6 @@ class IndexController {
     static std::mutex frameMutexes[NB_WEBCAMS];
     static cv::Mat frames[NB_WEBCAMS];
     static int cameraDevice[NB_WEBCAMS];
-
-    static int nbImages;
+    static int cameraID[NB_WEBCAMS];
+    static bool running;
 };
