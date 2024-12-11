@@ -51,6 +51,6 @@ class CalibrationController {
     static std::mutex chessboardMutexes[NB_WEBCAMS];
     static cv::Mat chessboards[NB_WEBCAMS];
     static int cameraID[NB_WEBCAMS];
-    static bool running;
+    static bool running, capturing;
     static int nbImages;
 };

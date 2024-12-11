@@ -4,6 +4,7 @@
 std::mutex CalibrationController::chessboardMutexes[NB_WEBCAMS];
 cv::Mat CalibrationController::chessboards[NB_WEBCAMS];
 bool CalibrationController::running;
+bool CalibrationController::capturing;
 int CalibrationController::nbImages;
 IndexController* CalibrationController::indexCtrl;
 cv::Size CalibrationController::boardSize;
@@ -48,6 +49,8 @@ CalibrationController::CalibrationController(struct mg_context* ctx, IndexContro
         mg_set_request_handler(ctx, "/calibration", rootHandler, nullptr);
         running = true;
     }
+
+    capturing = true;
 }
 
 CalibrationController::~CalibrationController() {
@@ -91,7 +94,7 @@ int CalibrationController::calibrateButtonHandler(struct mg_connection *conn, vo
 
 // Thread qui reprends l'image et tente de trouver l'échiquier
 void CalibrationController::calibThread(int camID) {
-    while(running){
+    while(running && capturing){
         std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
 
         cv::Mat frame = indexCtrl->getFrameById(camID);
@@ -210,7 +213,7 @@ int CalibrationController::streamHandler(struct mg_connection *conn, void *param
 // Enregistrement des images des deux caméras
 void CalibrationController::saveFrames() {
     for (int i = 0 ; i < NB_WEBCAMS ; i++) {
-        std::string fileName = "data/images/camera" + std::to_string(i) + "-" + std::to_string(nbImages) + ".jpg";
+        std::string fileName = "./data/images/camera" + std::to_string(i) + "-" + std::to_string(nbImages) + ".jpg";
         {
              std::lock_guard<std::mutex> lock(chessboardMutexes[i]);
              cv::imwrite(fileName, chessboards[i]);
@@ -223,6 +226,7 @@ void CalibrationController::saveFrames() {
 // Effacer toutes les images enregistrées
 void CalibrationController::eraseFrames() {
     fs::remove_all("data/images/");
+    fs::create_directory("data/images/");
     nbImages = 0;
 }
 
@@ -246,6 +250,7 @@ void CalibrationController::calibrateCameras() {
     std::cout << "Début calibration" << std::endl;
 
     // Stoppe les threads, on n'en a plus besoin
+    capturing = false;
     calibThread1.join();
     calibThread2.join();
 
