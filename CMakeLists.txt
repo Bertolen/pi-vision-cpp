@@ -7,7 +7,8 @@ project(WebcamStreamer)
 include_directories(include)
 set(SOURCES
     src/main.cpp
-    src/IndexController.cpp)
+    src/IndexController.cpp
+    src/CalibrationController.cpp)
 add_executable(WebcamStreamer ${SOURCES})
 
 # Ajoute le chemin vers les en-têtes de CivetWeb

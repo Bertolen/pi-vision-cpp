@@ -8,6 +8,7 @@
 #include <string>
 #include <filesystem>
 #include "IndexController.hpp"
+#include "CalibrationController.hpp"
 #include "commons.hpp"
 
 namespace fs = std::filesystem;
@@ -288,6 +289,7 @@ int main() {
     }
 
     IndexController* indexController = new IndexController(ctx);
+    CalibrationController* calibrationController = new CalibrationController(ctx, indexController);
 
     // Boucle principale pour maintenir le programme actif
     while (running) {
@@ -296,6 +298,7 @@ int main() {
 
     if (calibrated) disThread.join();
     delete indexController;
+    delete calibrationController;
     if (ctx) mg_stop(ctx);
     return 0;
 }
