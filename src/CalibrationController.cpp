@@ -8,6 +8,11 @@ int CalibrationController::nbImages;
 IndexController* CalibrationController::indexCtrl;
 cv::Size CalibrationController::boardSize;
 int CalibrationController::cameraID[NB_WEBCAMS];
+int CalibrationController::boardHeight;
+int CalibrationController::boardWidth;
+float CalibrationController::squareSize;
+std::thread CalibrationController::calibThread1;
+std::thread CalibrationController::calibThread2;
 
 CalibrationController::CalibrationController(struct mg_context* ctx, IndexController* indexCtrl) {
 
@@ -75,7 +80,7 @@ int CalibrationController::eraseButtonHandler(struct mg_connection *conn, void *
 
 // Gestion du bouton
 int CalibrationController::calibrateButtonHandler(struct mg_connection *conn, void *param) {
-    saveFrames();
+    calibrateCameras();
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\n"
@@ -323,8 +328,6 @@ void CalibrationController::calibrateCameras() {
 
     // Sauvegarder les paramètres de calibration
     saveCalibration("./data/calibration/stereo_calib.yml", cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T);
-    calibrated = true;
-    disThread = std::thread(disparityThread);
 
     std::cout << "Calibration terminée et sauvegardée dans './data/calibration/stereo_calib.yml'." << std::endl;
 }

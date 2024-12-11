@@ -33,20 +33,19 @@ class CalibrationController {
 
     private:
 
-    void eraseFrames();
-    void calibrateCameras();
-    void saveCalibration(const std::string& filename,
+    static void calibrateCameras();
+    static void saveCalibration(const std::string& filename,
                      const cv::Mat& cameraMatrix1, const cv::Mat& distCoeffs1,
                      const cv::Mat& cameraMatrix2, const cv::Mat& distCoeffs2,
                      const cv::Mat& R, const cv::Mat& T);
-
+    static void eraseFrames();
     static void saveFrames();
 
-    std::thread calibThread1;
-    std::thread calibThread2;
-    int boardWidth, boardHeight;
-    float squareSize;
+    static int boardWidth, boardHeight;
+    static float squareSize;
     
+    static std::thread calibThread1;
+    static std::thread calibThread2;
     static cv::Size boardSize;
     static IndexController* indexCtrl;
     static std::mutex chessboardMutexes[NB_WEBCAMS];
