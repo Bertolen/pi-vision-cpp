@@ -94,8 +94,9 @@ int CalibrationController::calibrateButtonHandler(struct mg_connection *conn, vo
 
 // Thread qui reprends l'image et tente de trouver l'échiquier
 void CalibrationController::calibThread(int camID) {
-    while(running && capturing){
+    while(running){
         std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
+        if(capturing) continue;
 
         cv::Mat frame = indexCtrl->getFrameById(camID);
         if(frame.empty()) continue;
@@ -251,8 +252,6 @@ void CalibrationController::calibrateCameras() {
 
     // Stoppe les threads, on n'en a plus besoin
     capturing = false;
-    calibThread1.join();
-    calibThread2.join();
 
     std::vector<std::vector<cv::Point3f>> objectPoints;
     std::vector<std::vector<cv::Point2f>> imagePoints1, imagePoints2;
@@ -338,6 +337,9 @@ void CalibrationController::calibrateCameras() {
 
     // Sauvegarder les paramètres de calibration
     saveCalibration("./data/calibration/stereo_calib.yml", cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T);
+
+    // Relance les threads
+    capturing = true;
 
     std::cout << "Calibration terminée et sauvegardée dans './data/calibration/stereo_calib.yml'." << std::endl;
 }
