@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y \
     libopencv-videoio-dev \
     libopencv-calib3d-dev \    
     && mkdir -p /app/civetweb \
+    && mkdir -p /app/resources \
     && rm -rf /var/lib/apt/lists/* \
     && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/app/civetweb/
 
@@ -48,7 +49,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY --from=build /app/WebcamStreamer /app
 COPY --from=build /app/civetweb/libcivetweb.so.1 /app/civetweb
-COPY --from=build /app/index.html /app
+COPY --from=build /app/resources /app/resources
 
 # Exposer le port HTTP
 EXPOSE 8080
