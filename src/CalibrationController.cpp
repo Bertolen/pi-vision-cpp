@@ -216,7 +216,7 @@ void CalibrationController::saveFrames() {
         std::string fileName = "./data/images/camera" + std::to_string(i) + "-" + std::to_string(nbImages) + ".jpg";
         {
              std::lock_guard<std::mutex> lock(chessboardMutexes[i]);
-             cv::imwrite(fileName, chessboards[i]);
+             cv::imwrite(fileName, indexCtrl->getFrameById(i));
         }
     }
 
@@ -300,6 +300,8 @@ void CalibrationController::calibrateCameras() {
             imagePoints1.push_back(corners1);
             imagePoints2.push_back(corners2);
             objectPoints.push_back(obj);
+        } else {
+            std::cerr << "Erreur! Pas d'échiquier trouvé!!!" << std::endl;
         }
         
         // Affichage à l'écran des images avec l'échiquier
