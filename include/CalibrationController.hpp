@@ -24,14 +24,21 @@ class CalibrationController {
     // Handlers
     static int streamHandler(struct mg_connection *conn, void *param);
     static int rootHandler(struct mg_connection *conn, void *param);
-    static int buttonHandler(struct mg_connection *conn, void *param);
+    static int saveButtonHandler(struct mg_connection *conn, void *param);
+    static int calibrateButtonHandler(struct mg_connection *conn, void *param);
+    static int eraseButtonHandler(struct mg_connection *conn, void *param);
 
     int nbImagesInMemory();
     int nbImagesInMemoryByCamID(int camID);
 
     private:
 
+    void eraseFrames();
     void calibrateCameras();
+    void saveCalibration(const std::string& filename,
+                     const cv::Mat& cameraMatrix1, const cv::Mat& distCoeffs1,
+                     const cv::Mat& cameraMatrix2, const cv::Mat& distCoeffs2,
+                     const cv::Mat& R, const cv::Mat& T);
 
     static void saveFrames();
 

@@ -46,8 +46,21 @@
             <img src="/chessboard2" class="video-stream" alt="Stream 2">
         </div>
     </div>
+    <button onclick="erase()">Erase Saved Frames</button>
     <button onclick="saveFrames()">Save Frames</button>
     <button onclick="calibrate()">Calibrate With Saved Frames</button>
+
+    <script>
+        function erase() {
+            fetch('/erase', { method: 'POST' })
+                .then(response => {
+                    if (!response.ok) {
+                        alert('Failed to erase frames.');
+                    }
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+    </script>
 
     <script>
         function saveFrames() {

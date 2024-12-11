@@ -1,5 +1,10 @@
-docker build -t webcam-streamer .
+Construire l'image depuis Windows pour Linux:
+docker buildx build --platform linux/arm64 -t bertolen/opencv-cpp-app .
 
-docker run -d --rm --device=/dev/video0:/dev/video0 --device=/dev/video2:/dev/video2 -p 8080:8080 -v "$(pwd)/data":/app/data --name webcam-stream webcam-streamer
+Construire l'image sans changement d'OS:
+docker build -t bertolen/opencv-cpp-app .
+
+Exécuter l'image sous linux
+docker run -d --rm --device=/dev/video0:/dev/video0 --device=/dev/video2:/dev/video2 -p 8080:8080 -v "$(pwd)/data":/app/data --name webcam-stream bertolen/opencv-cpp-app
 
 Rappel : pour trouver l'adresse ip de l'hôte il faut utiliser la commande ifconfig

@@ -37,7 +37,9 @@ CalibrationController::CalibrationController(struct mg_context* ctx, IndexContro
     } else {
         mg_set_request_handler(ctx, "/chessboard1", streamHandler, &cameraID[0]);
         mg_set_request_handler(ctx, "/chessboard2", streamHandler, &cameraID[1]);
-        mg_set_request_handler(ctx, "/calibrate", buttonHandler, nullptr);
+        mg_set_request_handler(ctx, "/erase", eraseButtonHandler, nullptr);
+        mg_set_request_handler(ctx, "/saveFrames", saveButtonHandler, nullptr);
+        mg_set_request_handler(ctx, "/calibrate", calibrateButtonHandler, nullptr);
         mg_set_request_handler(ctx, "/calibration", rootHandler, nullptr);
         running = true;
     }
@@ -45,11 +47,48 @@ CalibrationController::CalibrationController(struct mg_context* ctx, IndexContro
 
 CalibrationController::~CalibrationController() {
     running = false;
+    calibThread1.join();
+    calibThread2.join();
+}
+
+// Gestion du bouton
+int CalibrationController::saveButtonHandler(struct mg_connection *conn, void *param) {
+    saveFrames();
+
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/plain\r\n\r\n"
+              "Success!");
+    return 200;
+}
+
+// Gestion du bouton
+int CalibrationController::eraseButtonHandler(struct mg_connection *conn, void *param) {
+    eraseFrames();
+
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/plain\r\n\r\n"
+              "Success!");
+    return 200;
+}
+
+// Gestion du bouton
+int CalibrationController::calibrateButtonHandler(struct mg_connection *conn, void *param) {
+    saveFrames();
+
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/plain\r\n\r\n"
+              "Success!");
+    return 200;
 }
 
 // Thread qui reprends l'image et tente de trouver l'échiquier
 void CalibrationController::calibThread(int camID) {
     while(running){
+        std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
+
         cv::Mat frame = indexCtrl->getFrameById(camID);
         if(frame.empty()) continue;
 
@@ -73,8 +112,6 @@ void CalibrationController::calibThread(int camID) {
             std::lock_guard<std::mutex> lock(chessboardMutexes[camID]);
             chessboards[camID] = gray.clone();
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
     }
 }
 
@@ -178,15 +215,118 @@ void CalibrationController::saveFrames() {
     nbImages++;
 }
 
-// Gestion du bouton
-int CalibrationController::buttonHandler(struct mg_connection *conn, void *param) {
-    saveFrames();
+// Effacer toutes les images enregistrées
+void CalibrationController::eraseFrames() {
+    fs::remove_all("data/images/");
+    nbImages = 0;
+}
 
-    mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/plain\r\n\r\n"
-              "Success!");
-    return 200;
+// Sauvegarde du fichier de calibration
+void CalibrationController::saveCalibration(const std::string& filename,
+                     const cv::Mat& cameraMatrix1, const cv::Mat& distCoeffs1,
+                     const cv::Mat& cameraMatrix2, const cv::Mat& distCoeffs2,
+                     const cv::Mat& R, const cv::Mat& T) {
+    cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+    fs << "cameraMatrix1" << cameraMatrix1;
+    fs << "distCoeffs1" << distCoeffs1;
+    fs << "cameraMatrix2" << cameraMatrix2;
+    fs << "distCoeffs2" << distCoeffs2;
+    fs << "R" << R;
+    fs << "T" << T;
+    fs.release();
+}
+
+// Calibration des caméras
+void CalibrationController::calibrateCameras() {
+    std::cout << "Début calibration" << std::endl;
+
+    // Stoppe les threads, on n'en a plus besoin
+    calibThread1.join();
+    calibThread2.join();
+
+    std::vector<std::vector<cv::Point3f>> objectPoints;
+    std::vector<std::vector<cv::Point2f>> imagePoints1, imagePoints2;
+    cv::Mat gray1, gray2;
+
+    std::vector<cv::Point3f> obj;
+    for (int i = 0; i < boardHeight; i++) {
+        for (int j = 0; j < boardWidth; j++) {
+            obj.push_back(cv::Point3f(j * squareSize, i * squareSize, 0));
+        }
+    }
+
+    for (int i = 0 ; i < nbImages ; i++) {
+        std::cout << "Traitement image " << std::to_string(i) << std::endl;
+
+        // Lecture des images enregistrées
+        std::string filename1 = "./data/images/camera0-" + std::to_string(i) + ".jpg";
+        std::string filename2 = "./data/images/camera1-" + std::to_string(i) + ".jpg";
+        cv::Mat frame1 = cv::imread(filename1, 1);
+        cv::Mat frame2 = cv::imread(filename2, 1);
+
+        // Conversion en nuance de gris
+        cv::cvtColor(frame1, gray1, cv::COLOR_BGR2GRAY);
+        cv::cvtColor(frame2, gray2, cv::COLOR_BGR2GRAY);
+
+        // Recherche de l'échiquier
+        std::vector<cv::Point2f> corners1, corners2;
+        bool found1 = cv::findChessboardCorners(gray1, boardSize, corners1,
+                        cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
+        bool found2 = cv::findChessboardCorners(gray2, boardSize, corners2,
+                        cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
+
+        if (found1 && found2){
+            // Affinage des coins de l'échiquier
+            cv::cornerSubPix(gray1, corners1, cv::Size(11, 11), cv::Size(-1, -1),
+                             cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.1));
+            cv::cornerSubPix(gray2, corners2, cv::Size(11, 11), cv::Size(-1, -1),
+                             cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.1));
+                             
+            // Dessine les coins de l'échiquier sur les images
+            cv::drawChessboardCorners(gray1, boardSize, corners1, found1);
+            cv::drawChessboardCorners(gray2, boardSize, corners2, found2);
+
+            // Enregistrement des coordonnées dans les tableaux
+            imagePoints1.push_back(corners1);
+            imagePoints2.push_back(corners2);
+            objectPoints.push_back(obj);
+        }
+        
+        // Affichage à l'écran des images avec l'échiquier
+        {
+            std::lock_guard<std::mutex> lock(chessboardMutexes[0]);
+            chessboards[0] = gray1.clone();
+        }
+        
+        {
+            std::lock_guard<std::mutex> lock(chessboardMutexes[1]);
+            chessboards[1] = gray2.clone();
+        }
+    }
+
+    // Calibration des caméras
+    std::cout << "Calibration caméras" << std::endl;
+    cv::Mat cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2;
+    cv::Mat R, T, E, F;
+
+    std::cout << "Caméra 1" << std::endl;
+    cv::calibrateCamera(objectPoints, imagePoints1, gray1.size(), cameraMatrix1, distCoeffs1, cv::noArray(), cv::noArray());
+    std::cout << "Caméra 2" << std::endl;
+    cv::calibrateCamera(objectPoints, imagePoints2, gray2.size(), cameraMatrix2, distCoeffs2, cv::noArray(), cv::noArray());
+    std::cout << "Stéréovision" << std::endl;
+    cv::stereoCalibrate(objectPoints, imagePoints1, imagePoints2,
+                        cameraMatrix1, distCoeffs1,
+                        cameraMatrix2, distCoeffs2,
+                        gray1.size(), R, T, E, F,
+                        cv::CALIB_FIX_INTRINSIC,
+                        cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, 1e-5));
+
+    // Sauvegarder les paramètres de calibration
+    saveCalibration("./data/calibration/stereo_calib.yml", cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T);
+    calibrated = true;
+    disThread = std::thread(disparityThread);
+
+    std::cout << "Calibration terminée et sauvegardée dans './data/calibration/stereo_calib.yml'." << std::endl;
 }
 
 // Gestion de la page HTML
